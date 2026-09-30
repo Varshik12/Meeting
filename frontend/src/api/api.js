@@ -6,10 +6,27 @@
  */
 
 const getApiBaseUrl = () => {
-  const envUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL;
-  if (envUrl) {
-    return envUrl.endsWith('/') ? envUrl.slice(0, -1) : envUrl;
+  let envUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL;
+
+  if (envUrl && typeof envUrl === 'string' && envUrl.trim() !== '') {
+    envUrl = envUrl.trim().replace(/\/+$/, ''); // Strip trailing slashes
+
+    // Absolute URLs (e.g. https://meeting-581l.onrender.com)[cite: 2]
+    if (envUrl.startsWith('http://') || envUrl.startsWith('https://')) {
+      if (!envUrl.endsWith('/api')) {
+        return `${envUrl}/api`;
+      }
+      return envUrl;
+    }
+
+    // Relative URLs
+    if (!envUrl.startsWith('/api')) {
+      return `/api${envUrl.startsWith('/') ? '' : '/'}${envUrl}`;
+    }
+    return envUrl;
   }
+
+  // Fallback default relative API route for Vite dev server proxy & relative production[cite: 2]
   return '/api';
 };
 
@@ -25,7 +42,9 @@ export class ApiError extends Error {
 }
 
 async function request(endpoint, options = {}) {
-  const url = `${API_BASE}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const url = `${API_BASE}${cleanEndpoint}`;
+
   const config = {
     headers: {
       'Content-Type': 'application/json',
@@ -60,7 +79,7 @@ async function request(endpoint, options = {}) {
 }
 
 /**
- * Fetch all meeting rooms
+ * Fetch all meeting rooms[cite: 2]
  */
 export async function fetchRooms() {
   const json = await request('/rooms');
@@ -68,7 +87,7 @@ export async function fetchRooms() {
 }
 
 /**
- * Create a new custom meeting room
+ * Create a new custom meeting room[cite: 2]
  */
 export async function createRoom(data) {
   const json = await request('/rooms', {
@@ -79,7 +98,7 @@ export async function createRoom(data) {
 }
 
 /**
- * Delete a meeting room by ID
+ * Delete a meeting room by ID[cite: 2]
  */
 export async function deleteRoom(roomId) {
   const json = await request(`/rooms/${roomId}`, {
@@ -89,7 +108,7 @@ export async function deleteRoom(roomId) {
 }
 
 /**
- * Seed standard default meeting rooms
+ * Seed standard default meeting rooms[cite: 2]
  */
 export async function seedDefaultRooms() {
   const json = await request('/rooms/seed', {
@@ -99,7 +118,7 @@ export async function seedDefaultRooms() {
 }
 
 /**
- * Clear all bookings (reset application data)
+ * Clear all bookings (reset application data)[cite: 2]
  */
 export async function clearAllData() {
   await request('/rooms/clear-all', {
@@ -108,7 +127,7 @@ export async function clearAllData() {
 }
 
 /**
- * Fetch bookings filtered by room ID and/or date
+ * Fetch bookings filtered by room ID and/or date[cite: 2]
  */
 export async function fetchBookings(roomId, date) {
   const params = new URLSearchParams();
@@ -125,7 +144,7 @@ export async function fetchBookings(roomId, date) {
 }
 
 /**
- * Create a new meeting room reservation (Triggers Part A Conflict Detection)
+ * Create a new meeting room reservation (Triggers Part A Conflict Detection)[cite: 2]
  */
 export async function createBooking(bookingData) {
   const json = await request('/bookings', {
@@ -136,7 +155,7 @@ export async function createBooking(bookingData) {
 }
 
 /**
- * Cancel an existing booking by ID
+ * Cancel an existing booking by ID[cite: 2]
  */
 export async function cancelBooking(bookingId) {
   const json = await request(`/bookings/${bookingId}`, {
@@ -146,7 +165,7 @@ export async function cancelBooking(bookingId) {
 }
 
 /**
- * Calculate the next available contiguous slot for a room and date (Part B)
+ * Calculate the next available contiguous slot for a room and date (Part B)[cite: 2]
  */
 export async function fetchNextAvailableSlot(roomId, date, durationMinutes) {
   const params = new URLSearchParams({

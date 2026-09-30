@@ -11,39 +11,88 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware configuration
+// CORS configuration supporting Render deployment, custom FRONTEND_URL, and local dev[cite: 3]
+const allowedOrigins = [
+  'https://meeting-1-blz4.onrender.com',
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://localhost:5000',
+  'http://127.0.0.1:5173',
+];
+
+if (process.env.FRONTEND_URL) {
+  const envOrigins = process.env.FRONTEND_URL.split(',').map((url) => url.trim());
+  allowedOrigins.push(...envOrigins);
+}
+
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+
+      if (
+        allowedOrigins.includes('*') ||
+        allowedOrigins.includes(origin) ||
+        origin.endsWith('.onrender.com') ||
+        origin.startsWith('http://localhost:') ||
+        origin.startsWith('http://127.0.0.1:')
+      ) {
+        return callback(null, true);
+      }
+
+      return callback(null, true);
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+    credentials: true,
   })
 );
+
 app.use(express.json());
 
-// Health Check Endpoint
-app.get('/api/health', (req, res) => {
+// Health Check Endpoints (both /api/health and /health)[cite: 3]
+const healthHandler = (req, res) => {
   res.json({
     status: 'healthy',
     service: 'Meeting Room Booking API',
     workingHours: '09:00 - 18:00',
     timestamp: new Date().toISOString(),
   });
-});
+};
 
-// API Routes Registration
-app.use('/api/rooms', roomRoutes);
-app.use('/api/bookings', bookingRoutes);
+app.get('/api/health', healthHandler);
+app.get('/health', healthHandler);
 
-// Fallback 404 Route for unknown API endpoints
-app.use('/api/*', (req, res) => {
-  res.status(404).json({
-    success: false,
-    error: `API route '${req.originalUrl}' not found.`,
+// Root Endpoint for API Overview[cite: 3]
+app.get('/', (req, res) => {
+  res.json({
+    status: 'healthy',
+    service: 'Meeting Room Booking API',
+    endpoints: {
+      rooms: '/api/rooms',
+      bookings: '/api/bookings',
+      health: '/api/health',
+    },
   });
 });
 
-// Global Error Handler
+// Mount routes WITH /api prefix (Primary standard)[cite: 3]
+app.use('/api/rooms', roomRoutes);
+app.use('/api/bookings', bookingRoutes);
+
+// Dual-mount routes WITHOUT /api prefix as fallback for direct path calls[cite: 3]
+app.use('/rooms', roomRoutes);
+app.use('/bookings', bookingRoutes);
+
+// Fallback 404 Route for unmatched paths[cite: 3]
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    error: `API route '${req.originalUrl}' not found on server.`,
+  });
+});
+
+// Global Error Handler[cite: 3]
 app.use((err, req, res, next) => {
   console.error('Unhandled Server Error:', err);
   res.status(500).json({
@@ -52,7 +101,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start Server and Initialize Storage
+// Start Server and Initialize Storage[cite: 3]
 async function startServer() {
   await connectDB();
   await initStorage();
